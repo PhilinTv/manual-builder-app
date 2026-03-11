@@ -1,0 +1,141 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  DEACTIVATED
+}
+
+enum ManualStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum Severity {
+  DANGER
+  WARNING
+  CAUTION
+}
+
+model User {
+  id             String             @id @default(cuid())
+  email          String             @unique
+  name           String
+  passwordHash   String
+  role           Role               @default(EDITOR)
+  status         UserStatus         @default(PENDING)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  createdManuals Manual[]           @relation("CreatedManuals")
+  assignments    ManualAssignment[]
+  manualVersions ManualVersion[]
+  favorites      UserFavorite[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model Manual {
+  id           String             @id @default(cuid())
+  productName  String
+  overview     Json?
+  instructions Json?
+  warnings     Json?
+  status       ManualStatus       @default(DRAFT)
+  createdById  String
+  createdBy    User               @relation("CreatedManuals", fields: [createdById], references: [id])
+  assignments      ManualAssignment[]
+  versions         ManualVersion[]
+  libraryWarnings  ManualWarning[]
+  favoritedBy      UserFavorite[]
+  createdAt        DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+
+  @@index([productName])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([createdById])
+}
+
+model ManualAssignment {
+  id        String   @id @default(cuid())
+  manualId  String
+  manual    Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([manualId, userId])
+  @@index([userId])
+  @@index([manualId])
+}
+
+model ManualVersion {
+  id            String   @id @default(cuid())
+  manualId      String
+  manual        Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
+  version       Int
+  content       Json
+  authorId      String
+  author        User     @relation(fields: [authorId], references: [id])
+  note          String?
+  changeSummary String?
+  createdAt     DateTime @default(now())
+
+  @@unique([manualId, version])
+  @@index([manualId])
+  @@index([authorId])
+}
+
+model DangerWarning {
+  id          String          @id @default(cuid())
+  title       String
+  description String
+  severity    Severity
+  manuals     ManualWarning[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([title])
+  @@index([severity])
+}
+
+model ManualWarning {
+  id              String        @id @default(cuid())
+  manualId        String
+  manual          Manual        @relation(fields: [manualId], references: [id], onDelete: Cascade)
+  dangerWarningId String
+  dangerWarning   DangerWarning @relation(fields: [dangerWarningId], references: [id], onDelete: Cascade)
+  order           Int           @default(0)
+  createdAt       DateTime      @default(now())
+
+  @@unique([manualId, dangerWarningId])
+  @@index([manualId])
+  @@index([dangerWarningId])
+}
+
+model UserFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manualId  String
+  manual    Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, manualId])
+  @@index([userId])
+  @@index([manualId])
+}
