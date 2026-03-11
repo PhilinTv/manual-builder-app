@@ -12,9 +12,10 @@ import { LibraryWarningCard } from "@/components/manuals/library-warning-card";
 import { ManageAccess } from "@/components/manuals/manage-access";
 import { DeleteManualDialog } from "@/components/manuals/delete-manual-dialog";
 import { FavoriteToggle } from "@/components/manuals/favorite-toggle";
+import { VersionHistoryPanel } from "@/components/manuals/version-history-panel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Clock } from "lucide-react";
 import { StaleBanner } from "@/components/manuals/stale-banner";
 import { useNotifications } from "@/components/notifications/notification-provider";
 
@@ -72,6 +73,7 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
   const [assignees, setAssignees] = useState<Assignee[]>(manual.assignees);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [libraryWarnings, setLibraryWarnings] = useState<any[]>([]);
   const [initialFavorited, setInitialFavorited] = useState(false);
 
@@ -269,6 +271,15 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
             )}
           </div>
           <div className="flex gap-2">
+            <Button
+              data-testid="version-history-btn"
+              variant="outline"
+              size="icon"
+              onClick={() => setVersionHistoryOpen(true)}
+              title="Version History"
+            >
+              <Clock className="h-4 w-4" />
+            </Button>
             {canEdit && status === "DRAFT" && (
               <Button onClick={handlePublish}>Publish</Button>
             )}
@@ -429,6 +440,22 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         manualId={manual.id}
+      />
+
+      <VersionHistoryPanel
+        open={versionHistoryOpen}
+        onOpenChange={setVersionHistoryOpen}
+        manualId={manual.id}
+        onRollbackComplete={async () => {
+          const res = await fetch(`/api/manuals/${manual.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            setProductName(data.manual.productName);
+            setOverview(data.manual.overview);
+            setInstructions(data.manual.instructions || []);
+            setWarnings(data.manual.warnings || []);
+          }
+        }}
       />
     </div>
   );
