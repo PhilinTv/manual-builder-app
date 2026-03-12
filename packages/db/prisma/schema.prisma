@@ -29,6 +29,20 @@ enum Severity {
   CAUTION
 }
 
+enum TranslationStatus {
+  NOT_TRANSLATED
+  IN_PROGRESS
+  TRANSLATED
+}
+
+enum ImportStatus {
+  UPLOADING
+  EXTRACTING
+  READY_FOR_REVIEW
+  COMPLETED
+  FAILED
+}
+
 model User {
   id             String             @id @default(cuid())
   email          String             @unique
@@ -42,6 +56,8 @@ model User {
   assignments    ManualAssignment[]
   manualVersions ManualVersion[]
   favorites      UserFavorite[]
+  addedLanguages ManualLanguage[]
+  imports        PdfImport[]
 
   @@index([email])
   @@index([status])
@@ -53,13 +69,17 @@ model Manual {
   overview     Json?
   instructions Json?
   warnings     Json?
-  status       ManualStatus       @default(DRAFT)
-  createdById  String
-  createdBy    User               @relation("CreatedManuals", fields: [createdById], references: [id])
+  status          ManualStatus       @default(DRAFT)
+  primaryLanguage String             @default("en")
+  createdById     String
+  createdBy       User               @relation("CreatedManuals", fields: [createdById], references: [id])
   assignments      ManualAssignment[]
   versions         ManualVersion[]
   libraryWarnings  ManualWarning[]
   favoritedBy      UserFavorite[]
+  languages        ManualLanguage[]
+  translations     ManualTranslation[]
+  imports          PdfImport[]
   createdAt        DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   deletedAt    DateTime?
@@ -138,4 +158,62 @@ model UserFavorite {
   @@unique([userId, manualId])
   @@index([userId])
   @@index([manualId])
+}
+
+model ManualLanguage {
+  id           String    @id @default(cuid())
+  manualId     String
+  manual       Manual    @relation(fields: [manualId], references: [id], onDelete: Cascade)
+  languageCode String
+  addedById    String
+  addedBy      User      @relation(fields: [addedById], references: [id])
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@unique([manualId, languageCode])
+  @@index([manualId])
+}
+
+model ManualTranslation {
+  id               String            @id @default(cuid())
+  manualId         String
+  manual           Manual            @relation(fields: [manualId], references: [id], onDelete: Cascade)
+  languageCode     String
+  section          String
+  content          Json
+  status           TranslationStatus @default(NOT_TRANSLATED)
+  isAutoTranslated Boolean           @default(false)
+  autoTranslatedAt DateTime?
+  sourceHash       String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([manualId, languageCode, section])
+  @@index([manualId, languageCode])
+  @@index([manualId])
+}
+
+model PdfImport {
+  id               String       @id @default(cuid())
+  userId           String
+  status           ImportStatus @default(UPLOADING)
+  sourceFilename   String
+  fileSize         Int
+  filePath         String
+  rawText          String?
+  extractedData    Json?
+  confidence       Json?
+  detectedLanguage String?
+  errorMessage     String?
+  retryCount       Int          @default(0)
+  manualId         String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  user             User         @relation(fields: [userId], references: [id])
+  manual           Manual?      @relation(fields: [manualId], references: [id])
+
+  @@index([userId])
+  @@index([status])
 }

@@ -13,10 +13,17 @@ import { ManageAccess } from "@/components/manuals/manage-access";
 import { DeleteManualDialog } from "@/components/manuals/delete-manual-dialog";
 import { FavoriteToggle } from "@/components/manuals/favorite-toggle";
 import { VersionHistoryPanel } from "@/components/manuals/version-history-panel";
+import { LanguageSwitcher } from "@/components/manuals/language-switcher";
+import { TranslationEditor } from "@/components/manuals/translation-editor";
+import { TranslationEditorMobile } from "@/components/manuals/translation-editor-mobile";
+import { PublishWarningDialog } from "@/components/manuals/publish-warning-dialog";
+import { ChangePrimaryLanguageDialog } from "@/components/manuals/change-primary-language-dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Plus, Clock } from "lucide-react";
 import { StaleBanner } from "@/components/manuals/stale-banner";
+import { ExportButton } from "@/components/pdf/export-button";
+import { PreviewButton } from "@/components/pdf/preview-button";
 import { useNotifications } from "@/components/notifications/notification-provider";
 
 interface Instruction {
@@ -47,8 +54,24 @@ interface ManualData {
   instructions: Instruction[] | null;
   warnings: Warning[] | null;
   status: string;
+  primaryLanguage?: string;
   createdBy: { id: string; name: string };
   assignees: Assignee[];
+}
+
+interface LanguageEntry {
+  code: string;
+  name: string;
+  translated: number;
+  total: number;
+  isPrimary?: boolean;
+}
+
+interface TranslationSection {
+  section: string;
+  content: any;
+  status: "NOT_TRANSLATED" | "IN_PROGRESS" | "TRANSLATED";
+  updatedAt: string;
 }
 
 interface ManualEditorProps {
@@ -66,9 +89,9 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
   const [productName, setProductName] = useState(manual.productName);
   const [overview, setOverview] = useState<JSONContent | null>(manual.overview);
   const [instructions, setInstructions] = useState<Instruction[]>(
-    manual.instructions || []
+    Array.isArray(manual.instructions) ? manual.instructions : []
   );
-  const [warnings, setWarnings] = useState<Warning[]>(manual.warnings || []);
+  const [warnings, setWarnings] = useState<Warning[]>(Array.isArray(manual.warnings) ? manual.warnings : []);
   const [status, setStatus] = useState(manual.status);
   const [assignees, setAssignees] = useState<Assignee[]>(manual.assignees);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -76,8 +99,21 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [libraryWarnings, setLibraryWarnings] = useState<any[]>([]);
   const [initialFavorited, setInitialFavorited] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState(manual.primaryLanguage || "en");
+  const [primaryLanguage, setPrimaryLanguage] = useState(manual.primaryLanguage || "en");
+  const [languages, setLanguages] = useState<LanguageEntry[]>([
+    { code: manual.primaryLanguage || "en", name: "English", translated: 0, total: 0, isPrimary: true },
+  ]);
+  const [translations, setTranslations] = useState<TranslationSection[]>([]);
+  const [publishWarningOpen, setPublishWarningOpen] = useState(false);
+  const [incompleteLanguages, setIncompleteLanguages] = useState<any[]>([]);
+  const [changePrimaryOpen, setChangePrimaryOpen] = useState(false);
+  const [isDirtyAfterPublish, setIsDirtyAfterPublish] = useState(false);
+  const [markingSection, setMarkingSection] = useState<string | null>(null);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialRender = useRef(true);
+  const translationRequestIdRef = useRef<Record<string, number>>({});
   const isAdmin = userRole === "ADMIN";
 
   // Fetch library warnings on mount
@@ -103,6 +139,37 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
     }
     fetchFavoriteState();
   }, [manual.id]);
+
+  // Fetch languages
+  useEffect(() => {
+    async function fetchLanguages() {
+      const res = await fetch(`/api/manuals/${manual.id}/languages`);
+      if (res.ok) {
+        const data = await res.json();
+        setPrimaryLanguage(data.primaryLanguage);
+        if (data.languages.length > 0) {
+          setLanguages(data.languages);
+        }
+      }
+    }
+    fetchLanguages();
+  }, [manual.id]);
+
+  // Fetch translations when switching to non-primary language
+  useEffect(() => {
+    if (currentLanguage === primaryLanguage) {
+      setTranslations([]);
+      return;
+    }
+    async function fetchTranslations() {
+      const res = await fetch(`/api/manuals/${manual.id}/translations/${currentLanguage}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTranslations(data.sections);
+      }
+    }
+    fetchTranslations();
+  }, [manual.id, currentLanguage, primaryLanguage]);
 
   const save = useCallback(
     async (data: Record<string, any>) => {
@@ -136,19 +203,129 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
   useEffect(() => {
     if (!canEdit) return;
     debouncedSave({ productName, overview, instructions, warnings });
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+    } else if (status === "PUBLISHED") {
+      setIsDirtyAfterPublish(true);
+    }
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [productName, overview, instructions, warnings, debouncedSave, canEdit]);
+  }, [productName, overview, instructions, warnings, debouncedSave, canEdit, status]);
 
   async function handlePublish() {
+    // Check for incomplete translations
+    const nonPrimaryLangs = languages.filter((l) => l.code !== primaryLanguage);
+    const incomplete = nonPrimaryLangs.filter((l) => l.translated < l.total);
+    if (incomplete.length > 0) {
+      setIncompleteLanguages(incomplete);
+      setPublishWarningOpen(true);
+      return;
+    }
+    await doPublish();
+  }
+
+  async function doPublish() {
     const res = await fetch(`/api/manuals/${manual.id}/publish`, {
       method: "POST",
     });
     if (res.ok) {
       setStatus("PUBLISHED");
+      setIsDirtyAfterPublish(false);
       toast.success("Manual published successfully");
+      setPublishWarningOpen(false);
     }
+  }
+
+  async function refreshLanguages() {
+    const res = await fetch(`/api/manuals/${manual.id}/languages`);
+    if (res.ok) {
+      const data = await res.json();
+      setPrimaryLanguage(data.primaryLanguage);
+      if (data.languages.length > 0) {
+        setLanguages(data.languages);
+      }
+    }
+  }
+
+  async function handleTranslationUpdate(section: string, content: any) {
+    const reqId = (translationRequestIdRef.current[section] || 0) + 1;
+    translationRequestIdRef.current[section] = reqId;
+
+    const res = await fetch(
+      `/api/manuals/${manual.id}/translations/${currentLanguage}/${encodeURIComponent(section)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      }
+    );
+    // Discard stale response if a newer request (e.g. mark-as-translated) has been issued
+    if (translationRequestIdRef.current[section] !== reqId) return;
+    if (res.ok) {
+      const data = await res.json();
+      setTranslations((prev) =>
+        prev.map((t) => (t.section === section ? { ...t, content: data.content, status: data.status } : t))
+      );
+    }
+  }
+
+  async function handleMarkTranslated(section: string, pendingContent?: any) {
+    setMarkingSection(section);
+    // Bump request id to invalidate any in-flight content saves
+    const reqId = (translationRequestIdRef.current[section] || 0) + 1;
+    translationRequestIdRef.current[section] = reqId;
+
+    try {
+      const body: Record<string, any> = { status: "TRANSLATED" };
+      if (pendingContent !== undefined) {
+        body.content = pendingContent;
+      }
+      const res = await fetch(
+        `/api/manuals/${manual.id}/translations/${currentLanguage}/${encodeURIComponent(section)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setTranslations((prev) =>
+          prev.map((t) => (t.section === section ? { ...t, content: data.content, status: data.status } : t))
+        );
+        refreshLanguages();
+      } else {
+        toast.error("Failed to mark as translated");
+      }
+    } catch {
+      toast.error("Failed to mark as translated");
+    } finally {
+      setMarkingSection(null);
+    }
+  }
+
+  function getSourceSections() {
+    const sections: { section: string; label: string; content: any }[] = [];
+    sections.push({ section: "productName", label: "Product Name", content: productName });
+    if (overview) {
+      sections.push({ section: "overview", label: "Overview", content: overview });
+    }
+    for (const inst of instructions) {
+      sections.push({
+        section: `instruction:${inst.id}`,
+        label: `Chapter: ${inst.title || "Untitled"}`,
+        content: { title: inst.title, body: inst.body },
+      });
+    }
+    for (const warn of warnings) {
+      sections.push({
+        section: `warning:${warn.id}`,
+        label: `Warning: ${warn.title || "Untitled"}`,
+        content: { title: warn.title, description: warn.description, severity: warn.severity },
+      });
+    }
+    return sections;
   }
 
   function addInstruction() {
@@ -271,6 +448,18 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
             )}
           </div>
           <div className="flex gap-2">
+            <LanguageSwitcher
+              manualId={manual.id}
+              currentLanguage={currentLanguage}
+              primaryLanguage={primaryLanguage}
+              languages={languages}
+              onLanguageChange={(code) => setCurrentLanguage(code)}
+              onAddLanguage={async (code) => {
+                await refreshLanguages();
+                setCurrentLanguage(code);
+              }}
+              canEdit={canEdit}
+            />
             <Button
               data-testid="version-history-btn"
               variant="outline"
@@ -280,7 +469,9 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
             >
               <Clock className="h-4 w-4" />
             </Button>
-            {canEdit && status === "DRAFT" && (
+            <PreviewButton manualId={manual.id} currentLanguage={currentLanguage} />
+            <ExportButton manualId={manual.id} languages={languages} />
+            {canEdit && (status === "DRAFT" || isDirtyAfterPublish) && (
               <Button onClick={handlePublish}>Publish</Button>
             )}
             {isAdmin && (
@@ -294,119 +485,151 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
           </div>
         </div>
 
-        {/* Product Name */}
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold">Product Name</h2>
-          <Input
-            data-testid="product-name-input"
-            value={productName}
-            onChange={(e) => setProductName(e.target.value)}
-            disabled={!canEdit}
-            placeholder="Enter product name"
-          />
-        </div>
-
-        {/* Product Overview */}
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold">Product Overview</h2>
-          <div data-testid="overview-editor">
-            <TiptapEditor
-              content={overview}
-              onChange={setOverview}
-              editable={canEdit}
-              placeholder="Write a product overview..."
-            />
-          </div>
-        </div>
-
-        {/* Feature Instructions */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Feature Instructions</h2>
-            {canEdit && (
-              <Button variant="outline" size="sm" onClick={addInstruction}>
-                <Plus className="mr-1 h-4 w-4" />
-                Add Instruction
-              </Button>
-            )}
-          </div>
-          {instructions.map((instruction, index) => (
-            <InstructionBlock
-              key={instruction.id}
-              index={index}
-              title={instruction.title}
-              body={instruction.body}
-              onChange={(data) => updateInstruction(index, data)}
-              onRemove={() => removeInstruction(index)}
-              onMoveUp={() => moveInstruction(index, index - 1)}
-              onMoveDown={() => moveInstruction(index, index + 1)}
-              editable={canEdit}
-              isFirst={index === 0}
-              isLast={index === instructions.length - 1}
-            />
-          ))}
-        </div>
-
-        {/* Danger Warnings */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Danger Warnings</h2>
-
-          {/* Library Warnings */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-muted-foreground">Library Warnings</h3>
-            {canEdit && (
-              <WarningPicker
+        {currentLanguage !== primaryLanguage ? (
+          <>
+            {/* Translation Editor */}
+            <div className="hidden lg:block">
+              <TranslationEditor
                 manualId={manual.id}
-                linkedWarningIds={libraryWarnings.map((w) => w.id)}
-                onAdd={handleLibraryWarningAdded}
+                sourceLanguage={primaryLanguage}
+                targetLanguage={currentLanguage}
+                sourceSections={getSourceSections()}
+                translations={translations}
+                onTranslationUpdate={handleTranslationUpdate}
+                onMarkTranslated={handleMarkTranslated}
+                markingSection={markingSection}
+              />
+            </div>
+            <div className="lg:hidden">
+              <TranslationEditorMobile
+                manualId={manual.id}
+                sourceLanguage={primaryLanguage}
+                targetLanguage={currentLanguage}
+                sourceSections={getSourceSections()}
+                translations={translations}
+                onTranslationUpdate={handleTranslationUpdate}
+                onMarkTranslated={handleMarkTranslated}
+                markingSection={markingSection}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Product Name */}
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold">Product Name</h2>
+              <Input
+                data-testid="product-name-input"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                disabled={!canEdit}
+                placeholder="Enter product name"
+              />
+            </div>
+
+            {/* Product Overview */}
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold">Product Overview</h2>
+              <div data-testid="overview-editor">
+                <TiptapEditor
+                  content={overview}
+                  onChange={setOverview}
+                  editable={canEdit}
+                  placeholder="Write a product overview..."
+                />
+              </div>
+            </div>
+
+            {/* Chapters */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Chapters</h2>
+                {canEdit && (
+                  <Button variant="outline" size="sm" onClick={addInstruction}>
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add Chapter
+                  </Button>
+                )}
+              </div>
+              {instructions.map((instruction, index) => (
+                <InstructionBlock
+                  key={instruction.id}
+                  index={index}
+                  title={instruction.title}
+                  body={instruction.body}
+                  onChange={(data) => updateInstruction(index, data)}
+                  onRemove={() => removeInstruction(index)}
+                  onMoveUp={() => moveInstruction(index, index - 1)}
+                  onMoveDown={() => moveInstruction(index, index + 1)}
+                  editable={canEdit}
+                  isFirst={index === 0}
+                  isLast={index === instructions.length - 1}
+                />
+              ))}
+            </div>
+
+            {/* Danger Warnings */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold">Danger Warnings</h2>
+
+              {/* Library Warnings */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-muted-foreground">Library Warnings</h3>
+                {canEdit && (
+                  <WarningPicker
+                    manualId={manual.id}
+                    linkedWarningIds={libraryWarnings.map((w) => w.id)}
+                    onAdd={handleLibraryWarningAdded}
+                  />
+                )}
+                {libraryWarnings.map((warning) => (
+                  <LibraryWarningCard
+                    key={warning.id}
+                    id={warning.id}
+                    title={warning.title}
+                    description={warning.description}
+                    severity={warning.severity}
+                    onRemove={() => handleRemoveLibraryWarning(warning.id)}
+                    editable={canEdit}
+                  />
+                ))}
+              </div>
+
+              {/* Custom Warnings */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-muted-foreground">Custom Warnings</h3>
+                  {canEdit && (
+                    <Button variant="outline" size="sm" onClick={addWarning}>
+                      <Plus className="mr-1 h-4 w-4" />
+                      Add Warning
+                    </Button>
+                  )}
+                </div>
+                {warnings.map((warning, index) => (
+                  <WarningBlock
+                    key={warning.id}
+                    index={index}
+                    title={warning.title}
+                    description={warning.description}
+                    severity={warning.severity}
+                    onChange={(data) => updateWarning(index, data)}
+                    onRemove={() => removeWarning(index)}
+                    editable={canEdit}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Manage Access (Admin only) */}
+            {isAdmin && (
+              <ManageAccess
+                manualId={manual.id}
+                assignees={assignees}
+                onUpdate={refreshAssignees}
               />
             )}
-            {libraryWarnings.map((warning) => (
-              <LibraryWarningCard
-                key={warning.id}
-                id={warning.id}
-                title={warning.title}
-                description={warning.description}
-                severity={warning.severity}
-                onRemove={() => handleRemoveLibraryWarning(warning.id)}
-                editable={canEdit}
-              />
-            ))}
-          </div>
-
-          {/* Custom Warnings */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-muted-foreground">Custom Warnings</h3>
-              {canEdit && (
-                <Button variant="outline" size="sm" onClick={addWarning}>
-                  <Plus className="mr-1 h-4 w-4" />
-                  Add custom warning
-                </Button>
-              )}
-            </div>
-            {warnings.map((warning, index) => (
-              <WarningBlock
-                key={warning.id}
-                index={index}
-                title={warning.title}
-                description={warning.description}
-                severity={warning.severity}
-                onChange={(data) => updateWarning(index, data)}
-                onRemove={() => removeWarning(index)}
-                editable={canEdit}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Manage Access (Admin only) */}
-        {isAdmin && (
-          <ManageAccess
-            manualId={manual.id}
-            assignees={assignees}
-            onUpdate={refreshAssignees}
-          />
+          </>
         )}
       </div>
 
@@ -422,7 +645,7 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
               <a href="#" className="hover:text-foreground">Product Overview</a>
             </li>
             <li>
-              <a href="#" className="hover:text-foreground">Feature Instructions</a>
+              <a href="#" className="hover:text-foreground">Chapters</a>
             </li>
             <li>
               <a href="#" className="hover:text-foreground">Danger Warnings</a>
@@ -452,9 +675,28 @@ export function ManualEditor({ manual, canEdit, userRole }: ManualEditorProps) {
             const data = await res.json();
             setProductName(data.manual.productName);
             setOverview(data.manual.overview);
-            setInstructions(data.manual.instructions || []);
-            setWarnings(data.manual.warnings || []);
+            setInstructions(Array.isArray(data.manual.instructions) ? data.manual.instructions : []);
+            setWarnings(Array.isArray(data.manual.warnings) ? data.manual.warnings : []);
           }
+        }}
+      />
+
+      <PublishWarningDialog
+        open={publishWarningOpen}
+        onOpenChange={setPublishWarningOpen}
+        incompleteLanguages={incompleteLanguages}
+        onPublishAnyway={doPublish}
+      />
+
+      <ChangePrimaryLanguageDialog
+        open={changePrimaryOpen}
+        onOpenChange={setChangePrimaryOpen}
+        manualId={manual.id}
+        currentPrimaryLanguage={primaryLanguage}
+        onChanged={(code) => {
+          setPrimaryLanguage(code);
+          setCurrentLanguage(code);
+          refreshLanguages();
         }}
       />
     </div>

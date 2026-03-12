@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { Plus, Star } from "lucide-react";
 import { FavoriteToggle } from "@/components/manuals/favorite-toggle";
 import { usePersistedFilter } from "@/lib/hooks/use-persisted-filter";
+import { CreateManualDialog } from "@/components/import/create-manual-dialog";
+import { ImportPendingBadge } from "@/components/import/import-notification";
 
 interface ManualRow {
   id: string;
@@ -33,6 +35,7 @@ export function ManualList({ userRole }: ManualListProps) {
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoritesFilter, setFavoritesFilter] = usePersistedFilter("favorites-filter", false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const pageSize = 20;
 
   const fetchManuals = useCallback(async () => {
@@ -127,10 +130,16 @@ export function ManualList({ userRole }: ManualListProps) {
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <p className="text-lg text-muted-foreground">Create your first manual</p>
         {isAdmin && (
-          <Button onClick={handleCreateManual} className="mt-4">
-            <Plus className="mr-2 h-4 w-4" />
-            New Manual
-          </Button>
+          <>
+            <Button onClick={() => setCreateDialogOpen(true)} className="mt-4">
+              <Plus className="mr-2 h-4 w-4" />
+              New Manual
+            </Button>
+            <CreateManualDialog
+              open={createDialogOpen}
+              onOpenChange={setCreateDialogOpen}
+            />
+          </>
         )}
       </div>
     );
@@ -181,10 +190,17 @@ export function ManualList({ userRole }: ManualListProps) {
             </SelectContent>
           </Select>
           {isAdmin && (
-            <Button onClick={handleCreateManual}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Manual
-            </Button>
+            <>
+              <ImportPendingBadge />
+              <Button onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Manual
+              </Button>
+              <CreateManualDialog
+                open={createDialogOpen}
+                onOpenChange={setCreateDialogOpen}
+              />
+            </>
           )}
         </div>
       </div>

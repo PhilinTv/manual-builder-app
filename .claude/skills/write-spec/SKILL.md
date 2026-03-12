@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep
 
 You are a **Staff Engineer** writing an implementation spec from a provided document. Your spec must be concise, unambiguous, and produce acceptance criteria that can be directly automated with the project's test frameworks.
 
-**Known stack:** Next.js + React for frontend. Backend stack, ORM, and test frameworks are to be determined in E1 (Core Platform Foundation). Until E1 resolves these, keep specs flexible on backend technology and note assumptions.
+**Known stack (resolved in E1):** Turborepo + pnpm monorepo, Next.js 14+ App Router (full-stack), PostgreSQL + Prisma ORM, NextAuth.js v5, shadcn/ui + Tailwind CSS, Vitest (unit/integration), Playwright (E2E). App lives in `apps/web/` with `src/` directory.
 
 ## Startup
 
@@ -131,19 +131,19 @@ Organize tests into subsections by test file.
 
 ### Rules for UX Verification (Section 9)
 
-This section is **mandatory** for every spec that includes UI components. It defines the post-implementation UX validation step.
+This section is **mandatory** for every spec that includes UI components. It defines the post-implementation UX validation step using the `/playwright-test` skill.
 
 **Content must include:**
 
-1. **Verification command:** The exact `/verify-ux` invocation to run after implementation (e.g., `/verify-ux /inbox` or `/verify-ux "SLA monitoring dashboard"`).
+1. **Verification command:** The exact `/playwright-test` invocation to run after implementation (e.g., `/playwright-test docs/epic-2_spec.md`). The argument is the spec file path — the skill parses ACs from it automatically.
 2. **Pages/routes to verify:** List of all pages or routes affected by this feature.
-3. **Key UX checkpoints:** Specific UI behaviors, interactions, and visual states that `/verify-ux` must validate against the acceptance criteria and the project's UX design reference (`.claude/ux-design-reference.md`).
+3. **Key UX checkpoints:** Specific UI behaviors, interactions, and visual states that `/playwright-test` must validate against the acceptance criteria.
 4. **Expected E2E test coverage:** Reference which acceptance criteria (by AC-# ID) will be validated by headless Playwright E2E tests during verification.
 
 **Rules:**
 
 - Every spec with UI changes MUST include this section. For backend-only or infra-only specs, replace with a note: "No UI changes — UX verification not applicable."
-- The `/verify-ux` step is a **mandatory gate** before the feature can be considered done. Implementation is not complete until `/verify-ux` passes.
+- The `/playwright-test` step is a **mandatory gate** before the feature can be considered done. Implementation is not complete until `/playwright-test` passes.
 - If E2E tests do not yet exist for the affected pages, the spec must include an implementation task (in Section 4) to create them BEFORE the UX verification step.
 
 ### Writing Style Rules
@@ -162,7 +162,7 @@ After writing the spec, present a summary to the user:
 1. Total number of acceptance criteria and their type breakdown (e2e/unit/integration/manual).
 2. **Automated test coverage check:** Confirm that every AC has an automated test. Flag any `manual` criteria and justify why they cannot be automated. If more than 10% of criteria are `manual`, warn the user and suggest automated alternatives.
 3. List of test files that will be created.
-4. **UX verification readiness:** Confirm that Section 9 (UX Verification) is complete with the `/verify-ux` command, pages to verify, and AC coverage. For UI features, confirm E2E tests exist or are included in implementation tasks.
+4. **UX verification readiness:** Confirm that Section 9 (UX Verification) is complete with the `/playwright-test` command, pages to verify, and AC coverage. For UI features, confirm E2E tests exist or are included in implementation tasks.
 5. Any areas where you made judgment calls or assumptions.
 6. Ask the user if they want to adjust anything.
 

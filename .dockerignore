@@ -1,0 +1,14 @@
+node_modules
+.next
+.env
+.env.local
+.git
+dist
+out
+coverage
+test-results
+playwright-report
+blob-report
+*.tsbuildinfo
+.turbo
+.pnpm-store

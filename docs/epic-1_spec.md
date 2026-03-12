@@ -2,7 +2,7 @@
 
 ## 1. Goal
 
-Stand up the full-stack monorepo, authentication system, role-based access control, and responsive app shell so that an admin can log in, manage users (create, approve, deactivate), and an editor can log in and see their scoped view.
+Stand up the full-stack monorepo, authentication system, role-based access control, and responsive app shell so that an admin can log in, manage users (create, approve, reject, deactivate, reactivate), and an editor can log in and see their scoped view.
 
 ## 2. Dependencies
 
@@ -140,7 +140,7 @@ All pages under `src/app/(auth)/` layout (centered card, no sidebar).
 Layout at `src/app/(dashboard)/layout.tsx` — requires authenticated session.
 
 1. **Sidebar** (`src/components/sidebar.tsx`):
-   - Fixed left sidebar (w-64) on desktop (≥ 1024px).
+   - Fixed left sidebar (w-64) on desktop (>= 1024px).
    - Navigation links: Dashboard (home), Manuals (placeholder), User Management (admin only).
    - User info at bottom: name, role, sign-out button.
 
@@ -165,9 +165,9 @@ Page at `src/app/(dashboard)/admin/users/page.tsx` — requires `ADMIN` role.
    - Sortable by name or created date.
 
 2. **Actions per user:**
-   - Pending users: Approve (→ `ACTIVE`), Reject (→ `DEACTIVATED`).
-   - Active users: Deactivate (→ `DEACTIVATED`), Change role (toggle Admin/Editor).
-   - Deactivated users: Reactivate (→ `ACTIVE`).
+   - Pending users: Approve (-> `ACTIVE`), Reject (-> `DEACTIVATED`).
+   - Active users: Deactivate (-> `DEACTIVATED`), Change role (toggle Admin/Editor).
+   - Deactivated users: Reactivate (-> `ACTIVE`).
 
 3. **Create user dialog:**
    - Form: name, email, password, role select.
@@ -216,7 +216,7 @@ jobs:
 1. **Vitest** — install in `apps/web`, configure `vitest.config.ts` with path aliases.
 2. **Playwright** — install in `apps/web`, configure `playwright.config.ts`:
    - Base URL: `http://localhost:3000`.
-   - Projects: chromium, mobile chrome (viewport 375×667).
+   - Projects: chromium, mobile chrome (viewport 375x667).
    - `webServer` config to start dev server before tests.
 3. Add test scripts to `apps/web/package.json`: `test` (vitest), `test:e2e` (playwright).
 4. Create test helpers:
@@ -321,114 +321,132 @@ model User {
 
 ## 7. Acceptance Criteria
 
-| # | Criterion | Type | Test |
-|---|-----------|------|------|
-| AC-1 | Admin can log in with valid email and password and is redirected to dashboard | e2e | `auth.spec.ts`: fill login form → assert URL is `/` and welcome message visible |
-| AC-2 | Login with invalid credentials shows an error message | e2e | `auth.spec.ts`: fill wrong password → assert error text visible |
-| AC-3 | Login with a pending account shows "account not active" error | e2e | `auth.spec.ts`: login as pending user → assert error message |
-| AC-4 | Login with a deactivated account shows "account not active" error | e2e | `auth.spec.ts`: login as deactivated user → assert error message |
-| AC-5 | New user can register with name, email, and password | e2e | `auth.spec.ts`: fill registration form → assert redirect to `/pending` |
-| AC-6 | Registration with an existing email shows a validation error | e2e | `auth.spec.ts`: register with taken email → assert error message |
-| AC-7 | Registered user sees "pending approval" page and cannot access dashboard | e2e | `auth.spec.ts`: login as pending user → assert `/pending` page shown, navigation to `/` redirects back |
-| AC-8 | Admin can view a list of all users with name, email, role, and status | e2e | `admin-users.spec.ts`: login as admin → navigate to `/admin/users` → assert table with user rows |
-| AC-9 | Admin can filter user list by status (Pending, Active, Deactivated) | e2e | `admin-users.spec.ts`: select "Pending" filter → assert only pending users shown |
-| AC-10 | Admin can approve a pending user, changing their status to Active | e2e | `admin-users.spec.ts`: click Approve on pending user → assert status changes to Active |
-| AC-11 | Admin can deactivate an active user | e2e | `admin-users.spec.ts`: click Deactivate on active user → assert status changes to Deactivated |
-| AC-12 | Admin can create a new user with a specified role | e2e | `admin-users.spec.ts`: open create dialog → fill form → submit → assert new user appears in list |
-| AC-13 | Admin can change a user's role between Admin and Editor | e2e | `admin-users.spec.ts`: change role dropdown → assert role updated |
-| AC-14 | Editor cannot access `/admin/users` — redirected to dashboard | e2e | `rbac.spec.ts`: login as editor → navigate to `/admin/users` → assert redirect to `/` |
-| AC-15 | Editor does not see "User Management" link in sidebar navigation | e2e | `rbac.spec.ts`: login as editor → assert sidebar does not contain "User Management" |
-| AC-16 | App shell sidebar is visible on desktop (≥ 1024px) | e2e | `shell.spec.ts`: desktop viewport → assert sidebar visible |
-| AC-17 | App shell sidebar collapses to hamburger drawer on mobile (< 1024px) | e2e | `shell.spec.ts`: mobile viewport → assert sidebar hidden, hamburger visible → click hamburger → assert drawer opens |
-| AC-18 | Auth pages (login, register) render correctly on mobile viewport | e2e | `auth.spec.ts`: mobile viewport → assert login form is usable and not overflowing |
-| AC-19 | `hashPassword()` hashes a password and `verifyPassword()` returns true for correct input | unit | `auth.test.ts`: hash then verify → assert true; verify wrong password → assert false |
-| AC-20 | Seed script creates an initial admin user with ACTIVE status | integration | `seed.test.ts`: run seed → query DB → assert admin user exists with correct role and status |
-| AC-21 | Prisma migrations apply and roll back cleanly | integration | `migration.test.ts`: run `migrate deploy` → assert tables exist; run `migrate reset` → assert clean state |
-| AC-22 | CI pipeline runs lint, typecheck, and tests on push | e2e | Verify GitHub Actions workflow file exists and passes on a test push |
-| AC-23 | Unauthenticated user accessing `/` is redirected to `/login` | e2e | `auth.spec.ts`: visit `/` without session → assert redirect to `/login` |
+All E2E criteria follow the pattern: **Given** [state], **When** [action], **Then** [observable assertion].
 
-## 8. Test Plan
+### Authentication
 
-### E2E Tests (Playwright)
+| # | Criterion | Type |
+|---|-----------|------|
+| AC-1 | Given a seeded admin user (status ACTIVE), when the user fills in email and password on `/login` and clicks the submit button, then the browser navigates to `/` and a heading containing the admin's name is visible on the page. | e2e |
+| AC-2 | Given a seeded admin user, when the user fills in the correct email but an incorrect password on `/login` and submits, then the page remains at `/login` and an element with `[role="alert"]` containing the text "Invalid credentials" is visible. | e2e |
+| AC-3 | Given a seeded user with status PENDING, when the user fills in their email and password on `/login` and submits, then the page remains at `/login` and an element with `[role="alert"]` containing the text "Account not active" is visible. | e2e |
+| AC-4 | Given a seeded user with status DEACTIVATED, when the user fills in their email and password on `/login` and submits, then the page remains at `/login` and an element with `[role="alert"]` containing the text "Account not active" is visible. | e2e |
+| AC-5 | Given the `/register` page, when the user fills in name, email, password, and confirm password and clicks the submit button, then the browser navigates to `/pending` and the text "Your account is pending admin approval" is visible. | e2e |
+| AC-6 | Given a seeded user with email `existing@example.com`, when a new user tries to register on `/register` with the same email, then the page remains at `/register` and an element with `[role="alert"]` containing the text "already exists" is visible. | e2e |
+| AC-7 | Given a seeded user with status PENDING who is logged in, when they attempt to navigate to `/`, then the browser redirects to `/pending` and the text "pending admin approval" is visible. | e2e |
+| AC-8 | Given an unauthenticated browser, when the user navigates to `/`, then the browser redirects to `/login` and the URL path is `/login`. | e2e |
+
+### Admin User Management
+
+| # | Criterion | Type |
+|---|-----------|------|
+| AC-9 | Given an admin is logged in, when they navigate to `/admin/users`, then a `<table>` element is visible containing rows for each seeded user, and each row displays the user's name, email, role, and status. | e2e |
+| AC-10 | Given an admin is on `/admin/users` and a status filter dropdown is present, when the admin selects "Pending", then only rows where the status cell contains "Pending" are visible in the table. | e2e |
+| AC-11 | Given an admin is on `/admin/users` and a user with status "Pending" exists, when the admin clicks the "Approve" button in that user's row, then the status cell for that user changes to "Active". | e2e |
+| AC-12 | Given an admin is on `/admin/users` and a user with status "Pending" exists, when the admin clicks the "Reject" button in that user's row, then the status cell for that user changes to "Deactivated". | e2e |
+| AC-13 | Given an admin is on `/admin/users` and a user with status "Active" exists, when the admin clicks the "Deactivate" button in that user's row, then the status cell for that user changes to "Deactivated". | e2e |
+| AC-14 | Given an admin is on `/admin/users` and a user with status "Deactivated" exists, when the admin clicks the "Reactivate" button in that user's row, then the status cell for that user changes to "Active". | e2e |
+| AC-15 | Given an admin is on `/admin/users`, when they click a "Create User" button, then a dialog/modal appears with fields for name, email, password, and role. When the admin fills the form and submits, the dialog closes and a new row with the created user's name, email, role, and status "Active" appears in the table. | e2e |
+| AC-16 | Given an admin is on `/admin/users` and an active editor user exists, when the admin changes that user's role to "Admin" via the role control in the row, then the role cell for that user displays "Admin". | e2e |
+
+### Role-Based Access Control
+
+| # | Criterion | Type |
+|---|-----------|------|
+| AC-17 | Given an editor user is logged in, when they navigate to `/admin/users`, then the browser redirects to `/` and the URL path is `/`. | e2e |
+| AC-18 | Given an editor user is logged in and the sidebar is visible, then the sidebar does not contain any element with the text "User Management". | e2e |
+
+### Responsive App Shell
+
+| # | Criterion | Type |
+|---|-----------|------|
+| AC-19 | Given an authenticated user on a desktop viewport (1280x720), when the dashboard page loads, then a `<nav>` sidebar element with a width of at least 200px is visible on the left side of the page. | e2e |
+| AC-20 | Given an authenticated user on a mobile viewport (375x667), when the dashboard page loads, then the sidebar `<nav>` element is not visible and a `<button>` with an accessible name containing "menu" (the hamburger button) is visible. | e2e |
+| AC-21 | Given an authenticated user on a mobile viewport (375x667), when the user clicks the hamburger menu button, then a drawer/sheet element containing navigation links (including "Dashboard" and "Manuals") becomes visible. When the user clicks a navigation link inside the drawer, the drawer closes and the page navigates to the link's target. | e2e |
+| AC-22 | Given the `/login` page on a mobile viewport (375x667), when the page loads, then the login form (email input, password input, submit button) is fully visible within the viewport without horizontal scrolling. | e2e |
+| AC-23 | Given the `/register` page on a mobile viewport (375x667), when the page loads, then the registration form (name, email, password, confirm password inputs, submit button) is fully visible within the viewport without horizontal scrolling. | e2e |
+
+### Infrastructure (Non-E2E)
+
+| # | Criterion | Type |
+|---|-----------|------|
+| AC-24 | `hashPassword()` hashes a password and `verifyPassword()` returns true for the correct input and false for an incorrect input. | unit |
+| AC-25 | Seed script creates an initial admin user with email `admin@example.com`, role `ADMIN`, status `ACTIVE`. Running the seed script twice does not create duplicate users. | integration |
+| AC-26 | Prisma migrations apply successfully to an empty database (all tables from the schema are created). | integration |
+| AC-27 | `.github/workflows/ci.yml` exists and defines a job that runs `pnpm lint`, `pnpm typecheck`, and `pnpm test`. | structural |
+
+## 8. TDD Approach
+
+All tests should be written **before** the corresponding implementation code. Follow this order:
+
+1. **Write E2E test skeletons first.** Create the Playwright spec files (`auth.spec.ts`, `admin-users.spec.ts`, `rbac.spec.ts`, `shell.spec.ts`) with all test cases described in section 8.1 below. Each test should be fully written with selectors, actions, and assertions -- they will fail until the feature is implemented.
+2. **Write unit tests before utility functions.** Write `auth.test.ts` (AC-24) before implementing `hashPassword`/`verifyPassword`.
+3. **Write integration tests before seed/migration work.** Write `seed.test.ts` (AC-25) and `migration.test.ts` (AC-26) before finalizing the seed script and schema.
+4. **Implement the feature** to make the failing tests pass.
+5. **Verify** all tests pass before considering a story complete.
+
+Each story (1.1 through 1.6) is considered done only when all its associated acceptance criteria tests pass.
+
+## 9. Test Plan
+
+### 9.1 E2E Tests (Playwright)
 
 #### `tests/e2e/auth.spec.ts`
-**Setup:** Seed database with admin (active), editor (active), pending user, deactivated user.
+**Setup:** Seed database with admin (active), editor (active), pending user, deactivated user, user with email `existing@example.com`.
 
-- Login with valid admin credentials → redirected to dashboard (AC-1)
-- Login with invalid password → error message shown (AC-2)
-- Login with pending account → "not active" error (AC-3)
-- Login with deactivated account → "not active" error (AC-4)
-- Register new user → redirected to `/pending` (AC-5)
-- Register with existing email → validation error (AC-6)
-- Pending user cannot access dashboard → stays on `/pending` (AC-7)
-- Unauthenticated visit to `/` → redirect to `/login` (AC-23)
-- Login page renders correctly on mobile viewport (375×667) (AC-18)
-- Register page renders correctly on mobile viewport (AC-18)
+- Login with valid admin credentials -> redirected to `/`, heading with admin name visible (AC-1)
+- Login with invalid password -> `[role="alert"]` with "Invalid credentials" visible (AC-2)
+- Login with pending account -> `[role="alert"]` with "Account not active" visible (AC-3)
+- Login with deactivated account -> `[role="alert"]` with "Account not active" visible (AC-4)
+- Register new user -> redirected to `/pending`, "pending admin approval" text visible (AC-5)
+- Register with existing email -> `[role="alert"]` with "already exists" visible (AC-6)
+- Pending user cannot access dashboard -> redirected to `/pending` (AC-7)
+- Unauthenticated visit to `/` -> redirected to `/login` (AC-8)
+- Login page fully visible on mobile viewport 375x667, no horizontal overflow (AC-22)
+- Register page fully visible on mobile viewport 375x667, no horizontal overflow (AC-23)
 
 #### `tests/e2e/admin-users.spec.ts`
 **Setup:** Seed database with admin, 2 active editors, 1 pending user, 1 deactivated user. Login as admin.
 
-- User list displays all users with correct columns (AC-8)
-- Filter by "Pending" shows only pending users (AC-9)
-- Approve pending user → status becomes Active (AC-10)
-- Deactivate active user → status becomes Deactivated (AC-11)
-- Create new user via dialog → user appears in list (AC-12)
-- Change user role from Editor to Admin (AC-13)
+- User list table displays all users with Name, Email, Role, Status columns (AC-9)
+- Filter by "Pending" shows only pending users (AC-10)
+- Approve pending user -> status cell changes to "Active" (AC-11)
+- Reject pending user -> status cell changes to "Deactivated" (AC-12)
+- Deactivate active user -> status cell changes to "Deactivated" (AC-13)
+- Reactivate deactivated user -> status cell changes to "Active" (AC-14)
+- Create new user via dialog -> new row appears in table with status "Active" (AC-15)
+- Change user role from Editor to Admin -> role cell updates (AC-16)
 
 #### `tests/e2e/rbac.spec.ts`
 **Setup:** Seed database with admin and editor. Login as editor.
 
-- Navigate to `/admin/users` → redirected to `/` (AC-14)
-- Sidebar does not contain "User Management" link (AC-15)
+- Navigate to `/admin/users` -> redirected to `/` (AC-17)
+- Sidebar does not contain "User Management" text (AC-18)
 
 #### `tests/e2e/shell.spec.ts`
 **Setup:** Login as any authenticated user.
 
-- Desktop viewport: sidebar visible with navigation links (AC-16)
-- Mobile viewport: sidebar hidden, hamburger button visible (AC-17)
-- Mobile: click hamburger → drawer opens with navigation (AC-17)
-- Mobile: click nav link in drawer → drawer closes and navigates (AC-17)
+- Desktop viewport (1280x720): sidebar `<nav>` is visible with width >= 200px (AC-19)
+- Mobile viewport (375x667): sidebar hidden, hamburger button with accessible name "menu" is visible (AC-20)
+- Mobile: click hamburger -> drawer with navigation links appears; click link -> drawer closes and navigates (AC-21)
 
-### Unit Tests (Vitest)
+### 9.2 Unit Tests (Vitest)
 
 #### `tests/unit/auth.test.ts`
-- `hashPassword()` returns a bcrypt hash (AC-19)
-- `verifyPassword()` returns true for correct password (AC-19)
-- `verifyPassword()` returns false for incorrect password (AC-19)
+- `hashPassword()` returns a bcrypt hash (AC-24)
+- `verifyPassword()` returns true for correct password (AC-24)
+- `verifyPassword()` returns false for incorrect password (AC-24)
 
-### Integration Tests (Vitest)
+### 9.3 Integration Tests (Vitest)
 
 #### `tests/integration/seed.test.ts`
 **Setup:** Test database.
 
-- Seed script creates admin user with email `admin@example.com`, role `ADMIN`, status `ACTIVE` (AC-20)
-- Seed script is idempotent — running twice doesn't create duplicates (AC-20)
+- Seed script creates admin user with email `admin@example.com`, role `ADMIN`, status `ACTIVE` (AC-25)
+- Seed script is idempotent -- running twice does not create duplicates (AC-25)
 
 #### `tests/integration/migration.test.ts`
-- Prisma migrations apply successfully to empty database (AC-21)
-
-## 9. UX Verification
-
-**Verification command:** `/verify-ux "Auth pages, admin user management, and app shell"`
-
-**Pages/routes to verify:**
-- `/login` — login form
-- `/register` — registration form
-- `/pending` — pending approval status
-- `/` — dashboard (app shell)
-- `/admin/users` — admin user management
-
-**Key UX checkpoints:**
-- Login and register forms are centered, readable, and usable on both desktop and mobile
-- Error messages are visible and descriptive (not generic "something went wrong")
-- Sidebar is fixed on desktop with clear navigation hierarchy
-- Mobile drawer opens/closes smoothly with animation
-- User management table is readable with clear action buttons
-- Status badges use distinct colors (e.g., green=active, yellow=pending, red=deactivated)
-- Create user dialog is a modal with proper focus trap
-- All interactive elements have visible focus states (keyboard accessibility)
-
-**Expected E2E test coverage:** AC-1 through AC-18, AC-23 (all e2e-type criteria).
+- Prisma migrations apply successfully to empty database (AC-26)
 
 ## 10. Out of Scope
 

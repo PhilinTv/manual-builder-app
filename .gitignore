@@ -1,1 +1,20 @@
 .idea
+node_modules
+.next
+.env
+.env.local
+dist
+out
+coverage
+test-results
+playwright-report
+blob-report
+*.tsbuildinfo
+.turbo
+.pnpm-store
+
+# Playwright screenshots
+tests/screenshots/
+
+# Generated Playwright test specs
+tests/playwright/
