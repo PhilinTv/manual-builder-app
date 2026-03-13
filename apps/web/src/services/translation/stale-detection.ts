@@ -1,4 +1,4 @@
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 
 export function computeContentHash(content: any): string {
   const str = JSON.stringify(content);

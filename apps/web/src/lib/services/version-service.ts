@@ -1,4 +1,4 @@
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { generateChangeSummary } from "@/lib/utils/diff-summary";
 
 interface ManualSnapshot {

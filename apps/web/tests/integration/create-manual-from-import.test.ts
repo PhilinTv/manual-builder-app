@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { PrismaClient } from "@wapp/db";
+import { PrismaClient } from "@app/db";
 import { createManualFromImport } from "@/services/import/create-manual";
 import { markdownToTiptap } from "@/services/import/markdown-to-tiptap";
 

@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 
 // Mock prisma
-vi.mock("@wapp/db", () => ({
+vi.mock("@app/db", () => ({
   prisma: {
     manualTranslation: {
       findMany: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock("@wapp/db", () => ({
   },
 }));
 
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 
 describe("Glossary extraction", () => {
   beforeEach(() => {

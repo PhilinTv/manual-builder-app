@@ -1,4 +1,4 @@
-import { prisma, type ManualStatus } from "@wapp/db";
+import { prisma, type ManualStatus } from "@app/db";
 
 export type ManualListParams = {
   page?: number;

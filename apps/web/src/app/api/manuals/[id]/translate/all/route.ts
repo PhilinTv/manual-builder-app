@@ -5,7 +5,7 @@ import { getTranslations } from "@/lib/services/translation-service";
 import { getTranslationProvider } from "@/services/translation";
 import { extractGlossary } from "@/services/translation/glossary";
 import { computeContentHash } from "@/services/translation/stale-detection";
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { z } from "zod";
 
 const translateAllSchema = z.object({

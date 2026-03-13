@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { processImport } from "@/services/import/pipeline";
 
 export async function GET(

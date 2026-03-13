@@ -1,4 +1,4 @@
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { renderManualToHtml } from "./template";
 import { generatePdfFilename } from "./filename";
 import { getBrowser } from "@/lib/puppeteer";

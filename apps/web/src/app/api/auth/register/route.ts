@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { hashPassword } from "@/lib/auth-utils";
 import { z } from "zod";
 

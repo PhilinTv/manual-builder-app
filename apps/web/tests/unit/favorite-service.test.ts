@@ -7,7 +7,7 @@ const mockCreate = vi.fn();
 const mockDelete = vi.fn();
 const mockTransaction = vi.fn();
 
-vi.mock("@wapp/db", () => ({
+vi.mock("@app/db", () => ({
   prisma: {
     userFavorite: {
       findUnique: (...args: any[]) => mockFindUnique(...args),

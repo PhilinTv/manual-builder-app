@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { createManualFromImport } from "@/services/import/create-manual";
 import { z } from "zod";
 

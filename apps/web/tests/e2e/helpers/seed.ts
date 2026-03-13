@@ -5,7 +5,7 @@ import { execSync } from "child_process";
  * Called in test setup/beforeAll blocks.
  */
 export function seedTestDatabase() {
-  execSync("pnpm --filter @wapp/db db:seed", {
+  execSync("pnpm --filter @app/db db:seed", {
     cwd: process.cwd(),
     env: { ...process.env },
     stdio: "pipe",

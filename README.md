@@ -1,4 +1,4 @@
-# User Manuals Builder (WAPP)
+# User Manuals Builder
 
 A full-stack application for creating, managing, and translating user manuals with WYSIWYG editing, version history, real-time collaboration notifications, and AI-powered translations.
 
@@ -45,29 +45,45 @@ pnpm install
 cp .env.example .env
 ```
 
-Edit `.env` if needed — this single file is copied to all packages by `pnpm setup`:
+The defaults work out of the box for local dev — no edits required unless you need AI translations.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/wapp?schema=public` | PostgreSQL connection string |
+| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/app?schema=public` | PostgreSQL connection string |
 | `AUTH_SECRET` | `your-secret-key-here` | NextAuth session secret (change in production) |
-| `OPENAI_API_KEY` | `your-openai-api-key-here` | Required only for Epic 8 (automated translations) |
+| `OPENAI_API_KEY` | `your-openai-api-key-here` | Required only for automated translations |
 
-### 3. Run setup
+### 3. Start PostgreSQL
+
+```bash
+pnpm docker:up
+```
+
+Starts a Postgres 16 container on port 5432 via Docker Compose.
+
+### 4. Provision the database
 
 ```bash
 pnpm setup
 ```
 
-This single command starts PostgreSQL via Docker, waits for readiness, generates the Prisma client, pushes the schema to create all tables, and seeds the database.
+This copies `.env` to sub-packages, waits for Postgres readiness, generates the Prisma client, pushes the schema to create all tables, and seeds test data.
 
-### 4. Start the dev server
+### 5. Start the dev server
 
 ```bash
 pnpm dev
 ```
 
 The app runs at **http://localhost:3000**.
+
+### Reset everything
+
+If you need a completely fresh database:
+
+```bash
+pnpm docker:reset && pnpm db:wait && pnpm db:generate && pnpm db:push && pnpm db:seed
+```
 
 ## Seed Credentials
 
@@ -119,7 +135,7 @@ All scripts run from the monorepo root:
 ### Database-specific scripts (from `packages/db`):
 
 ```bash
-pnpm --filter @wapp/db db:studio    # Open Prisma Studio (visual DB browser)
+pnpm --filter @app/db db:studio    # Open Prisma Studio (visual DB browser)
 ```
 
 ## Running Tests
@@ -136,7 +152,7 @@ Unit tests run without a database. Integration tests that require PostgreSQL wil
 
 ```bash
 # Install Playwright browsers (first time only)
-pnpm --filter @wapp/web exec playwright install
+pnpm --filter @app/web exec playwright install
 
 # Run E2E tests (starts dev server automatically)
 pnpm test:e2e
@@ -180,5 +196,5 @@ Key models: `User`, `Manual`, `ManualAssignment`, `ManualVersion`, `DangerWarnin
 Inspect the full schema at `packages/db/prisma/schema.prisma` or run Prisma Studio:
 
 ```bash
-pnpm --filter @wapp/db db:studio
+pnpm --filter @app/db db:studio
 ```

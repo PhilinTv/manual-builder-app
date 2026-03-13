@@ -1,4 +1,4 @@
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 
 interface ImportedManualData {
   productName: string;

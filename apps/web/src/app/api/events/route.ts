@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { eventBus, type SSEEvent, type SSEClientEvent } from "@/lib/events/event-bus";
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 
 export const dynamic = "force-dynamic";
 

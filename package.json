@@ -1,5 +1,5 @@
 {
-  "name": "wapp",
+  "name": "app",
   "private": true,
   "scripts": {
     "dev": "turbo dev",
@@ -15,7 +15,7 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v && docker compose up -d",
-    "db:wait": "until docker compose exec -T postgres pg_isready -U postgres -d wapp > /dev/null 2>&1; do sleep 1; done",
+    "db:wait": "until docker compose exec -T postgres pg_isready -U postgres -d app > /dev/null 2>&1; do sleep 1; done",
     "setup": "cp .env apps/web/.env && cp .env packages/db/.env && pnpm docker:up && pnpm db:wait && pnpm db:generate && pnpm db:push && pnpm db:seed"
   },
   "devDependencies": {

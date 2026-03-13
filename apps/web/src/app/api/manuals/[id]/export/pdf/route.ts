@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { canUserEdit } from "@/lib/services/manual-service";
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { generateManualPdf } from "@/services/pdf/generate";
 
 export async function GET(

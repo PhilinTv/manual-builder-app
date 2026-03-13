@@ -10,8 +10,12 @@ vi.mock("@/lib/auth", () => ({
 // Mock prisma
 const mockFindFirst = vi.fn();
 const mockCreate = vi.fn();
-vi.mock("@wapp/db", () => ({
+const mockUserFindUnique = vi.fn();
+vi.mock("@app/db", () => ({
   prisma: {
+    user: {
+      findUnique: (...args: any[]) => mockUserFindUnique(...args),
+    },
     pdfImport: {
       findFirst: (...args: any[]) => mockFindFirst(...args),
       create: (...args: any[]) => mockCreate(...args),
@@ -53,6 +57,7 @@ describe("POST /api/imports/upload", () => {
     mockMkdir.mockResolvedValue(undefined);
     mockWriteFile.mockResolvedValue(undefined);
     mockProcessImport.mockResolvedValue(undefined);
+    mockUserFindUnique.mockResolvedValue({ id: "user-1" });
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -65,6 +70,20 @@ describe("POST /api/imports/upload", () => {
     expect(response.status).toBe(401);
     const body = await response.json();
     expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 401 when session user no longer exists in database", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "stale-user-id" } });
+    mockUserFindUnique.mockResolvedValue(null);
+
+    const { POST } = await import("@/app/api/imports/upload/route");
+    const request = createFormDataRequest(createPdfFile());
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error).toBe("Session expired. Please log in again.");
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it("returns 409 when an import is already in progress", async () => {

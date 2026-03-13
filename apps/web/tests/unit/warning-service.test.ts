@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock prisma
-vi.mock("@wapp/db", () => {
+vi.mock("@app/db", () => {
   const mockPrisma = {
     dangerWarning: {
       findMany: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock("@wapp/db", () => {
   };
 });
 
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 
 describe("warning-service unit tests", () => {
   beforeEach(() => {

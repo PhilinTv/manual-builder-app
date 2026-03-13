@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { Prisma, TranslationStatus } from "@wapp/db";
+import { Prisma, TranslationStatus } from "@app/db";
 
 describe("ManualTranslation schema", () => {
   test("ManualTranslation model includes Epic 8 prep fields", () => {

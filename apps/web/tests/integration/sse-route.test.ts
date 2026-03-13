@@ -9,7 +9,7 @@ vi.mock("@/lib/auth", () => ({
 
 // Mock prisma
 const mockFindMany = vi.fn();
-vi.mock("@wapp/db", () => ({
+vi.mock("@app/db", () => ({
   prisma: {
     manualAssignment: {
       findMany: (...args: any[]) => mockFindMany(...args),

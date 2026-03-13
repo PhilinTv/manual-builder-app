@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { ReviewPageClient } from "./review-client";
 
 interface ReviewPageProps {

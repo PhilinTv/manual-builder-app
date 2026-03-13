@@ -1,4 +1,4 @@
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import * as fs from "fs/promises";
 import { extractTextFromPdf } from "./extract-text";
 import { detectLanguage } from "./detect-language";

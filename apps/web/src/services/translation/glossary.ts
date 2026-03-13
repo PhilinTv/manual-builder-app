@@ -1,4 +1,4 @@
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import type { GlossaryEntry } from "./types";
 
 function textFromJson(json: any): string {

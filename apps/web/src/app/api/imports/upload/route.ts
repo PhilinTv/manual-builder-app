@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { processImport } from "@/services/import/pipeline";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -13,6 +13,18 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Verify user still exists in database (JWT may outlive DB resets)
+    const userExists = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true },
+    });
+    if (!userExists) {
+      return NextResponse.json(
+        { error: "Session expired. Please log in again." },
+        { status: 401 }
+      );
     }
 
     // Check for existing in-progress import
@@ -52,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save file to temp directory
-    const uploadDir = process.env.UPLOAD_DIR || path.join(os.tmpdir(), "wapp-imports");
+    const uploadDir = process.env.UPLOAD_DIR || path.join(os.tmpdir(), "app-imports");
     await fs.mkdir(uploadDir, { recursive: true });
 
     const filename = `${Date.now()}-${file.name}`;

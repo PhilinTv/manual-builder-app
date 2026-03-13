@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import type { Role } from "@wapp/db";
+import type { Role } from "@app/db";
 
 export { hashPassword, verifyPassword } from "@/lib/password";
 

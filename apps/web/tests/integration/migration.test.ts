@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from "vitest";
-import { PrismaClient } from "@wapp/db";
+import { PrismaClient } from "@app/db";
 import { execSync } from "child_process";
 
 describe("Prisma migrations", () => {
@@ -11,7 +11,7 @@ describe("Prisma migrations", () => {
 
   it("AC-26: Prisma migrations apply and create all expected tables", async () => {
     // Reset and apply migrations
-    execSync("pnpm --filter @wapp/db db:migrate:dev -- --name init --skip-generate", {
+    execSync("pnpm --filter @app/db db:migrate:dev -- --name init --skip-generate", {
       cwd: process.cwd(),
       env: { ...process.env },
       stdio: "pipe",

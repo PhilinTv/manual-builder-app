@@ -1,4 +1,4 @@
-import { prisma } from "@wapp/db";
+import { prisma } from "@app/db";
 import { isValidLanguageCode, getLanguageName } from "@/lib/constants/languages";
 
 export async function addLanguage(

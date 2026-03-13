@@ -1,4 +1,4 @@
-import { prisma, type Severity } from "@wapp/db";
+import { prisma, type Severity } from "@app/db";
 
 export type WarningListParams = {
   search?: string;
